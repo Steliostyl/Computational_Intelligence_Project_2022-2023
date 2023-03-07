@@ -3,6 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
+import category_encoders as ce
 
 def plotHistogram(values, name) -> None:
     # An "interface" to matplotlib.axes.Axes.hist() method
@@ -24,16 +25,19 @@ def plot2(values, name):
     plt.title(name)
     plt.show()
 
-def encodeCatFeatures(original_df: pd.DataFrame) -> pd.DataFrame:
-    return
+def oneHotEncodeColumns(categ_cols_df: pd.DataFrame) -> pd.DataFrame:
+    """One hot encodes the columns of categorical features (columns)
+    of the dataset (dataframe)."""
+
+    # One hot encode categorical columns (that have no order)
+    encoder=ce.OneHotEncoder(handle_unknown='return_nan',return_df=True,use_cat_names=True)
+    categ_cols_df = encoder.fit_transform(categ_cols_df)
+    return categ_cols_df
 
 def preprocessDataset() -> pd.DataFrame:
     # Load dataset from file
     files_folder = Path("Part A/Files/")
     original_df = pd.read_csv(files_folder / "dataset-HAR-PUC-Rio.csv", delimiter=';', low_memory=False, decimal=',')
-
-    # Save column order
-    original_columns = original_df.columns
 
     # Extract numerical columns
     numerical_columns = original_df.select_dtypes(include="number")
@@ -42,12 +46,19 @@ def preprocessDataset() -> pd.DataFrame:
     normalized_values = MinMaxScaler().fit_transform(numerical_columns.values)
     normalized_df = pd.DataFrame(columns=numerical_columns.columns, data=normalized_values)
 
-    # Print initial and normalized dataframe head
-    print(numerical_columns.head())
-    print(normalized_df.head())
-
     # One-hot encode categorical features
-    encoded_cat_features = encodeCatFeatures(original_df)
+    encoded_cat_features = oneHotEncodeColumns(original_df[['user', 'class', 'gender']])
 
-    return
+    # Combine the 2 dataframes
+    final_df = pd.concat([normalized_df, encoded_cat_features], axis=1)
 
+    # Reorder columns
+    cols = final_df.columns.to_list()
+    final_df.columns = cols[:-7] + ["gender_man", "gender_woman"] + cols[-7:-2]
+    
+    final_df['label'] = final_df[['class_sitting', 'class_sittingdown',
+                                  'class_standing', 'class_standingup',
+                                  'class_walking']].values.tolist()
+    
+
+    return final_df
