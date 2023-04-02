@@ -1,48 +1,86 @@
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Dense, Dropout
+from keras.layers import Dense
+from keras.optimizers import gradient_descent_v2
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score
+from numpy import mean
+from numpy import std
 
-def getNetworkInput(processed_df: pd.DataFrame) -> tuple[Sequential, object]:
-    """Accepts the processed dataset dataframe as input
-    and returns a tuple of X, y used to train the model later."""
+H = 0.001  # Learning rate.
+M = 0.0  # Momentum
+NW_IN = 22  # Size of the input of the network.
+NW_OUT = 5  # Output of the network (labels). Equal to the ammount of classes.
+EPOCHS = 20  # Epochs in training
+BATCH_SIZE = 20  # Batch size
 
-    class_categories = ['class_sitting', 'class_sittingdown',
-                                  'class_standing', 'class_standingup',
-                                  'class_walking']
-    X = processed_df.drop(class_categories + ['label'], axis=1).values
-    y = processed_df[class_categories].values.astype(int)
-    
-    return (X, y)
+def getNetworkInput(processed_df: pd.DataFrame) -> list:
+  """Accepts the processed dataset dataframe as input
+  and returns a tuple of X, y used to train the model later."""
 
-def trainNetwork(X, y) -> tuple:
-    """Trains a DNN model to predict user's stance based
-    on input data (sensor data and personal information)"""
+  class_categories = [
+      'class_sitting', 'class_sittingdown', 'class_standing',
+      'class_standingup', 'class_walking'
+  ]
 
-    print(X.shape)
-    print(y.shape)
+  X = processed_df.drop(class_categories, axis=1)
+  y = processed_df[class_categories]
 
-    # Define model
-    model = Sequential()
-    model.add(Dense(256, input_dim=X.shape[1], activation="relu"))
-    model.add(Dense(64, activation="relu"))
-    model.add(Dense(5, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics='binary_accuracy')
-    # Train model
-    history = model.fit(X, y, verbose=1, batch_size=10, epochs=3, validation_split=0.7)
-    return (model, history)
+  return X.values, y.values
+
+def getModel():
+  model = Sequential()
+  model.add(
+      Dense(NW_OUT, input_dim=NW_IN, kernel_initializer='he_uniform',
+            activation='relu'))
+  model.add(Dense(NW_OUT, activation='sigmoid'))
+  model.compile(loss='binary_crossentropy',
+                optimizer=gradient_descent_v2.SGD(learning_rate=H, momentum=M),
+                metrics=['binary_accuracy', 'MSE'])
+  return model
+
+def evaluateModel(X, y, model: Sequential) -> tuple[object, list]:
+  results = list()
+  cv = KFold(n_splits=5, shuffle=True)
+  best_acc = 0
+  for train_index, test_index in cv.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    model = getModel()
+    history = model.fit(X_train, y_train, verbose=1, epochs=EPOCHS,
+                        validation_data=(X_test, y_test))
+    predicted_y = model.predict(X_test)
+    predicted_y = predicted_y.round()
+    acc = accuracy_score(y_test, predicted_y)
+
+    if acc > best_acc:
+      best_acc = acc
+      best_history = history
+
+    # store result
+    print('>%.3f' % acc)
+    results.append(acc)
+
+  # summarize performance
+  summary = 'Accuracy: %.3f (%.3f)' % (mean(results), std(results))
+  return [best_history, results, summary]
+
+def plot_result(history, item):
+  """Used for the graphs. Takes as input the name of the metric and 
+    outputs graphs with the progression of said metric over EPOCHS."""
+
+  plt.plot(history.history[item], label=item)
+  plt.xlabel("Epochs")
+  plt.ylabel(item)
+  plt.title("Train {} Over Epochs".format(item), fontsize=14)
+  plt.legend()
+  plt.grid()
+  plt.show()
 
 def plot_history(history) -> None:
-    items = ["loss", "binary_accuracy"]
-    print(history.history)
+  items = ["loss", "MSE", "binary_accuracy"]
+  items = ['val_' + item for item in items]
 
-    for item in items:
-        plt.plot(history.history[item], label=item)
-        plt.plot(history.history["val_" + item], label="val_" + item)
-        plt.xlabel("Epochs")
-        plt.ylabel(item)
-        plt.title("Train and Validation {} Over Epochs".format(item), fontsize=14)
-        plt.legend()
-        plt.grid()
-        plt.show()
+  [plot_result(history, item) for item in items]

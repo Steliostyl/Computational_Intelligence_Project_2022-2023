@@ -1,0 +1,35 @@
+Class Distribution:
+class_sitting         47,370
+class_sittingdown     12,415
+class_standing        43,390
+class_standingup     101,374
+class_walking         64,259
+
+Total 268,808
+
+Percentages:
+class_sitting         17.62%
+class_sittingdown     04.62%
+class_standing        16.14%
+class_standingup      37.71%
+class_walking         23.91%
+
+KFold Distribution
+Fold 1
+class_sitting         37,973
+class_sittingdown     09,950
+class_standing        34,701
+class_standingup      81,155
+class_walking 	    51,351
+
+Total 215,130
+
+Percentages:
+class_sitting         17.65% (For the whole dataset: 17.62%)
+class_sittingdown     04.63% (For the whole dataset: 04.62%)
+class_standing        16.13% (For the whole dataset: 16.14%)
+class_standingup      37.72% (For the whole dataset: 37.71%)
+class_walking         23.87% (For the whole dataset: 23.91%)
+
+
+
