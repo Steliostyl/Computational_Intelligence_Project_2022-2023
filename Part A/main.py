@@ -10,12 +10,11 @@ def main():
 
   X, y = network.getNetworkInput(preprocessed_df)
   model = network.getModel()
-  best_history, results, summary = network.evaluateModel(X, y, model)
+  best_history, final_metrics = network.evaluateModel(X, y, model)
 
-  save_model(model, "Part A/Files/model")
-  pprint(results)
-  print(summary)
-  network.plot_history(best_history)
+  #save_model(model, "Part A/Files/model")
+  pprint(final_metrics)
+  #network.plot_history(best_history)
   #model = load_model('Part A/model')
 
 if __name__ == '__main__':

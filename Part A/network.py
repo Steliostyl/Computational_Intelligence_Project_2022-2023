@@ -2,10 +2,10 @@ import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import gradient_descent_v2
+from keras.metrics import Accuracy
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
 from numpy import mean
 from numpy import std
 
@@ -13,8 +13,10 @@ H = 0.001  # Learning rate.
 M = 0.0  # Momentum
 NW_IN = 22  # Size of the input of the network.
 NW_OUT = 5  # Output of the network (labels). Equal to the ammount of classes.
-EPOCHS = 20  # Epochs in training
+EPOCHS = 10  # Epochs in training
 BATCH_SIZE = 20  # Batch size
+metrics = ["MSE", "binary_accuracy"]
+h_metrics = metrics + ["loss"]
 
 def getNetworkInput(processed_df: pd.DataFrame) -> list:
   """Accepts the processed dataset dataframe as input
@@ -37,50 +39,54 @@ def getModel():
             activation='relu'))
   model.add(Dense(NW_OUT, activation='sigmoid'))
   model.compile(loss='binary_crossentropy',
-                optimizer=gradient_descent_v2.SGD(learning_rate=H, momentum=M),
-                metrics=['binary_accuracy', 'MSE'])
+                optimizer=gradient_descent_v2.SGD(learning_rate=H,
+                                                  momentum=M), metrics=metrics)
+  #model.compile(
+  #    loss='binary_crossentropy', optimizer='adam',
+  #    metrics=['accuracy', 'binary_accuracy', 'categorical_accuracy', 'MSE'])
   return model
 
-def evaluateModel(X, y, model: Sequential) -> tuple[object, list]:
-  results = list()
+def evaluateModel(X, y, model: Sequential) -> tuple[object, pd.DataFrame]:
   cv = KFold(n_splits=5, shuffle=True)
+  final_metrics_list = []
   best_acc = 0
-  for train_index, test_index in cv.split(X):
+  for i, (train_index, test_index) in enumerate(cv.split(X)):
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
     model = getModel()
     history = model.fit(X_train, y_train, verbose=1, epochs=EPOCHS,
                         validation_data=(X_test, y_test))
-    predicted_y = model.predict(X_test)
-    predicted_y = predicted_y.round()
-    acc = accuracy_score(y_test, predicted_y)
+    final_metrics_list.append(
+        [i + 1] + [history.history[metric][-1] for metric in h_metrics])
 
-    if acc > best_acc:
-      best_acc = acc
+    val_bin_acc = history.history['val_binary_accuracy'][-1]
+    if val_bin_acc > best_acc:
       best_history = history
+      best_acc = val_bin_acc
 
-    # store result
-    print('>%.3f' % acc)
-    results.append(acc)
+  final_metrics = pd.DataFrame(final_metrics_list,
+                               columns=["Fold"] + h_metrics).set_index('Fold')
+  final_metrics.loc["Average"] = final_metrics.mean()
+  best_row_index = final_metrics['loss'].idxmin()
+  final_metrics.loc["Best"] = final_metrics.loc[best_row_index]
+  #final_metrics.concat(final_metrics.mean(numeric_only=True), ignore_index=True)
 
-  # summarize performance
-  summary = 'Accuracy: %.3f (%.3f)' % (mean(results), std(results))
-  return [best_history, results, summary]
+  return (best_history, final_metrics)
 
 def plot_result(history, item):
   """Used for the graphs. Takes as input the name of the metric and 
     outputs graphs with the progression of said metric over EPOCHS."""
 
   plt.plot(history.history[item], label=item)
+  plt.plot(history.history["val_" + item], label="val_" + item)
   plt.xlabel("Epochs")
   plt.ylabel(item)
-  plt.title("Train {} Over Epochs".format(item), fontsize=14)
+  plt.title("Train and validation {} over epochs".format(item), fontsize=14)
   plt.legend()
   plt.grid()
   plt.show()
 
 def plot_history(history) -> None:
-  items = ["loss", "MSE", "binary_accuracy"]
-  items = ['val_' + item for item in items]
+  items = h_metrics
 
   [plot_result(history, item) for item in items]
