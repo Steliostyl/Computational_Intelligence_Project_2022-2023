@@ -9,14 +9,15 @@ from sklearn.model_selection import KFold
 from numpy import mean
 from numpy import std
 
-H = 0.001  # Learning rate.
-M = 0.0  # Momentum
+H = 0.01  # Learning rate.
+M = 0.6  # Momentum
 NW_IN = 22  # Size of the input of the network.
 NW_OUT = 5  # Output of the network (labels). Equal to the ammount of classes.
 EPOCHS = 10  # Epochs in training
 BATCH_SIZE = 20  # Batch size
 metrics = ["MSE", "binary_accuracy"]
 h_metrics = metrics + ["loss"]
+val_metrics = ["val_" + metric for metric in h_metrics]
 
 def getNetworkInput(processed_df: pd.DataFrame) -> list:
   """Accepts the processed dataset dataframe as input
@@ -35,7 +36,7 @@ def getNetworkInput(processed_df: pd.DataFrame) -> list:
 def getModel():
   model = Sequential()
   model.add(
-      Dense(NW_OUT, input_dim=NW_IN, kernel_initializer='he_uniform',
+      Dense(NW_IN + NW_OUT, input_dim=NW_IN, kernel_initializer='he_uniform',
             activation='relu'))
   model.add(Dense(NW_OUT, activation='sigmoid'))
   model.compile(loss='binary_crossentropy',
@@ -43,10 +44,10 @@ def getModel():
                                                   momentum=M), metrics=metrics)
   #model.compile(
   #    loss='binary_crossentropy', optimizer='adam',
-  #    metrics=['accuracy', 'binary_accuracy', 'categorical_accuracy', 'MSE'])
+  #    metrics=['binary_accuracy', 'MSE'])
   return model
 
-def evaluateModel(X, y, model: Sequential) -> tuple[object, pd.DataFrame]:
+def evaluateModel(X, y) -> tuple[object, pd.DataFrame]:
   cv = KFold(n_splits=5, shuffle=True)
   final_metrics_list = []
   best_acc = 0
@@ -57,19 +58,19 @@ def evaluateModel(X, y, model: Sequential) -> tuple[object, pd.DataFrame]:
     history = model.fit(X_train, y_train, verbose=1, epochs=EPOCHS,
                         validation_data=(X_test, y_test))
     final_metrics_list.append(
-        [i + 1] + [history.history[metric][-1] for metric in h_metrics])
+        [i + 1] +
+        [history.history[metric][-1] for metric in h_metrics + val_metrics])
 
     val_bin_acc = history.history['val_binary_accuracy'][-1]
     if val_bin_acc > best_acc:
       best_history = history
       best_acc = val_bin_acc
 
-  final_metrics = pd.DataFrame(final_metrics_list,
-                               columns=["Fold"] + h_metrics).set_index('Fold')
+  final_metrics = pd.DataFrame(final_metrics_list, columns=["Fold"] +
+                               h_metrics + val_metrics).set_index('Fold')
   final_metrics.loc["Average"] = final_metrics.mean()
-  best_row_index = final_metrics['loss'].idxmin()
+  best_row_index = final_metrics['val_loss'].idxmin()
   final_metrics.loc["Best"] = final_metrics.loc[best_row_index]
-  #final_metrics.concat(final_metrics.mean(numeric_only=True), ignore_index=True)
 
   return (best_history, final_metrics)
 
