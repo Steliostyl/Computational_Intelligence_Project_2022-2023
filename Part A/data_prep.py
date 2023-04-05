@@ -5,6 +5,11 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import category_encoders as ce
 
+CLASSES = [
+    "class_sitting", "class_sittingdown", "class_standing", "class_standingup",
+    "class_walking"
+]
+
 # Load dataset from file
 files_folder = Path("Part A/Files/")
 
@@ -42,17 +47,16 @@ def preprocessDataset() -> pd.DataFrame:
                                data=normalized_values)
 
   # One-hot encode categorical features
+  # One-hot encode the categorical features
+  encoded_cat_features = pd.get_dummies(original_df,
+                                        columns=['user', 'gender', 'class'])
   encoder = ce.OneHotEncoder(handle_unknown='return_nan', return_df=True,
                              use_cat_names=True)
   encoded_cat_features = encoder.fit_transform(
-      original_df[['user', 'class', 'gender']])
+      original_df[['user', 'gender', 'class']])
 
   # Combine the 2 dataframes
   final_df = pd.concat([normalized_df, encoded_cat_features], axis=1)
-
-  # Reorder columns
-  cols = final_df.columns.to_list()
-  final_df.columns = cols[:-7] + ["gender_man", "gender_woman"] + cols[-7:-2]
 
   # Save processed dataset to file
   final_df.to_csv(files_folder / "Processed dataset.csv", index=False)

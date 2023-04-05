@@ -2,20 +2,18 @@ import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import gradient_descent_v2
-from keras.metrics import Accuracy
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.model_selection import KFold
-from numpy import mean
-from numpy import std
+from data_prep import CLASSES
 
-H = 0.01  # Learning rate.
+H = 0.001  # Learning rate.
 M = 0.6  # Momentum
 NW_IN = 22  # Size of the input of the network.
 NW_OUT = 5  # Output of the network (labels). Equal to the ammount of classes.
 EPOCHS = 10  # Epochs in training
-BATCH_SIZE = 20  # Batch size
-metrics = ["MSE", "binary_accuracy"]
+BATCH_SIZE = 10  # Batch size
+metrics = ["MSE", "accuracy"]
 h_metrics = metrics + ["loss"]
 val_metrics = ["val_" + metric for metric in h_metrics]
 
@@ -23,28 +21,20 @@ def getNetworkInput(processed_df: pd.DataFrame) -> list:
   """Accepts the processed dataset dataframe as input
   and returns a tuple of X, y used to train the model later."""
 
-  class_categories = [
-      'class_sitting', 'class_sittingdown', 'class_standing',
-      'class_standingup', 'class_walking'
-  ]
-
-  X = processed_df.drop(class_categories, axis=1)
-  y = processed_df[class_categories]
+  X = processed_df.drop(CLASSES, axis=1)
+  y = processed_df[CLASSES]
 
   return X.values, y.values
 
 def getModel():
   model = Sequential()
-  model.add(
-      Dense(NW_IN + NW_OUT, input_dim=NW_IN, kernel_initializer='he_uniform',
-            activation='relu'))
-  model.add(Dense(NW_OUT, activation='sigmoid'))
-  model.compile(loss='binary_crossentropy',
+  model.add(Dense(NW_OUT, input_dim=NW_IN, activation='relu'))
+  model.add(Dense(NW_OUT, activation='softmax'))
+  model.compile(loss='categorical_crossentropy',
                 optimizer=gradient_descent_v2.SGD(learning_rate=H,
                                                   momentum=M), metrics=metrics)
-  #model.compile(
-  #    loss='binary_crossentropy', optimizer='adam',
-  #    metrics=['binary_accuracy', 'MSE'])
+  #model.compile(loss='categorical_crossentropy', optimizer='adam',
+  #              metrics=['accuracy', 'MSE'])
   return model
 
 def evaluateModel(X, y) -> tuple[object, pd.DataFrame]:
@@ -61,7 +51,7 @@ def evaluateModel(X, y) -> tuple[object, pd.DataFrame]:
         [i + 1] +
         [history.history[metric][-1] for metric in h_metrics + val_metrics])
 
-    val_bin_acc = history.history['val_binary_accuracy'][-1]
+    val_bin_acc = history.history['val_accuracy'][-1]
     if val_bin_acc > best_acc:
       best_history = history
       best_acc = val_bin_acc
