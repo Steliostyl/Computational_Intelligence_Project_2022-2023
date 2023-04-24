@@ -1,5 +1,6 @@
 import data_prep
 import network
+import network2
 
 def main():
   preprocessed_df = data_prep.preprocessDataset()

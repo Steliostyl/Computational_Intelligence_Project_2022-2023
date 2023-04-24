@@ -1,17 +1,12 @@
-from pathlib import Path
 import pandas as pd
 from matplotlib import pyplot as plt
 import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-import category_encoders as ce
 
 CLASSES = [
     "class_sitting", "class_sittingdown", "class_standing", "class_standingup",
     "class_walking"
 ]
-
-# Load dataset from file
-files_folder = Path("Part A/Files/")
 
 def plotHistogram(values, name) -> None:
   # An "interface" to matplotlib.axes.Axes.hist() method
@@ -35,30 +30,32 @@ def plot2(values, name):
 
 def preprocessDataset() -> pd.DataFrame:
   # Read dataset file and load it to a dataframe
-  original_df = pd.read_csv(files_folder / "dataset-HAR-PUC-Rio.csv",
-                            delimiter=';', low_memory=False, decimal=',')
+  original_df = pd.read_csv("dataset-HAR-PUC-Rio.csv", delimiter=';',
+                            low_memory=False, decimal=',')
 
   # Extract numerical columns
   numerical_columns = original_df.select_dtypes(include="number")
 
-  # Normalize (min max scale) numerical values
+  # Testing different feature selection
+  #numerical_columns = original_df[[
+  #"how_tall_in_meters",
+  #    "x1", "y1", "z1", "x2", "y2", "z2", "x3", "y3",
+  #    "z3", "x4", "y4", "z4"
+  #]]
+
+  # Standardize numerical values
   normalized_values = StandardScaler().fit_transform(numerical_columns.values)
   normalized_df = pd.DataFrame(columns=numerical_columns.columns,
                                data=normalized_values)
 
   # One-hot encode categorical features
-  # One-hot encode the categorical features
-  encoded_cat_features = pd.get_dummies(original_df,
-                                        columns=['user', 'gender', 'class'])
-  encoder = ce.OneHotEncoder(handle_unknown='return_nan', return_df=True,
-                             use_cat_names=True)
-  encoded_cat_features = encoder.fit_transform(
-      original_df[['user', 'gender', 'class']])
+  encoded_cat_features = pd.get_dummies(
+      original_df.drop(numerical_columns.columns, axis=1))
 
   # Combine the 2 dataframes
   final_df = pd.concat([normalized_df, encoded_cat_features], axis=1)
 
   # Save processed dataset to file
-  final_df.to_csv(files_folder / "Processed dataset.csv", index=False)
+  final_df.to_csv("Processed dataset.csv", index=False)
 
   return final_df
