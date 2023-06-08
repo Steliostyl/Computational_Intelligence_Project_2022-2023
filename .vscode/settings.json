@@ -1,0 +1,16 @@
+{
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  /*"python.formatting.blackArgs": [
+    "--line-length = 119"
+  ],*/
+  "python.formatting.provider": "black",
+  /*"python.formatting.blackArgs": [
+    "--line-length",
+    "120"
+  ],*/
+  "python.linting.enabled": true,
+  "editor.formatOnSave": true /*,
+  "python.formatting.blackPath": "C:/Program Files/Python311/Scripts/black.exe"*/
+}
