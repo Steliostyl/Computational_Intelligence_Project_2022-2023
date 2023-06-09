@@ -2,6 +2,7 @@ import pandas as pd
 import ga
 from functions import SENSOR_LIST
 import functions
+from sklearn.preprocessing import StandardScaler
 
 
 def main() -> None:
@@ -11,7 +12,7 @@ def main() -> None:
         low_memory=False,
         decimal=",",
     )[SENSOR_LIST + ["class"]]
-    scaler = functions.getStandardScaler(dataset[SENSOR_LIST])
+    scaler = StandardScaler().fit(dataset[SENSOR_LIST].values)
     normalized_dataset = dataset.copy(deep=True)
     normalized_dataset[SENSOR_LIST] = scaler.transform(
         normalized_dataset[SENSOR_LIST].values
@@ -21,9 +22,14 @@ def main() -> None:
     class_stats_df = functions.getClassStats(normalized_dataset)
     # print(class_stats_df)
 
-    random_ind = ga.generateRandomIndividual(class_stats_df)
-    random_ind.update_fitness_score(class_stats_df)
+    random_ind = ga.spawnRandomIndividual(class_stats_df)
+    random_ind.updateFitnessScore(class_stats_df)
     print(f"Fitness score of individual: {random_ind.fitness_score}")
+
+    new_population = ga.spawnRandomPopulation(10, class_stats_df)
+    new_population.calculateFitnessScores()
+    parents = new_population.biasedWheelSelection()
+    print([x.fitness_score for x in parents])
 
 
 if __name__ == "__main__":
