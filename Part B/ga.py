@@ -12,6 +12,8 @@ class Individual:
 
     def __init__(self, sensor_data: list) -> None:
         self.sensor_data = pd.DataFrame([sensor_data], columns=SENSOR_LIST)
+        self.fitness_score = 0
+        self.pr_n = 0
 
     def updateFitnessScore(self, class_stats_df) -> None:
         # Calculate the euclidean distance of the person's sensor
@@ -66,6 +68,7 @@ class Population:
         self.class_stats_df = class_stats_df
         self.min_score = 100
         self.max_score = 0
+        self.fitness_sum = 0
 
     def calculateFitnessScores(self) -> None:
         """Calculates fitness scores for all individuals and saves min/max
@@ -77,30 +80,36 @@ class Population:
                 self.min_score = individual.fitness_score
             if individual.fitness_score > self.max_score:
                 self.max_score = individual.fitness_score
+            self.fitness_sum += individual.fitness_score
+
+        self.individuals = sorted(
+            self.individuals, key=lambda x: x.fitness_score, reverse=False
+        )
+        prev_total = 0
+        for ind in self.individuals:
+            prev_total += ind.fitness_score / self.fitness_sum
+            ind.pr_n = prev_total
 
     def biasedWheelSelection(self) -> list[Individual, Individual]:
         """Chooses 2 individuals from current generation
         by performing biased wheel selection and returns them."""
 
-        sorted_list = sorted(
-            self.individuals, key=lambda x: x.fitness_score, reverse=False
-        )
-        print([ind.fitness_score for ind in sorted_list])
-
         parent_1 = None
         parent_2 = None
 
-        while (parent_1 is None) or (parent_2 is None):
-            number = np.random.uniform(self.min_score, self.max_score)
+        [print([ind.fitness_score, ind.pr_n]) for ind in self.individuals]
+
+        while (parent_2 is None) or (parent_1 == parent_2):
+            number = np.random.uniform(0, 1)
             print("Random number: ", number)
-            for ind in sorted_list:
-                if ind.fitness_score < number:
-                    continue
-                selected_ind = ind
-                if parent_1 is None:
-                    parent_1 = selected_ind
-                else:
-                    parent_2 = selected_ind
+            for ind in self.individuals:
+                if ind.pr_n > number:
+                    selected_ind = ind
+                    if parent_1 is None:
+                        parent_1 = selected_ind
+                    else:
+                        parent_2 = selected_ind
+                    break
 
         print(parent_1.fitness_score, parent_2.fitness_score)
         return [parent_1, parent_2]
