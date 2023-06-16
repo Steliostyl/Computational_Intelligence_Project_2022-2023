@@ -4,7 +4,7 @@ from functions import SENSOR_LIST
 import functions
 from sklearn.preprocessing import StandardScaler
 
-GENERATIONS = 50
+GENERATIONS = 10
 
 
 def main() -> None:
@@ -15,16 +15,17 @@ def main() -> None:
         decimal=",",
     )[SENSOR_LIST + ["class"]]
     scaler = StandardScaler().fit(dataset[SENSOR_LIST].values)
-    normalized_dataset = dataset.copy(deep=True)
-    normalized_dataset[SENSOR_LIST] = scaler.transform(
-        normalized_dataset[SENSOR_LIST].values
+    standardized_dataset = dataset.copy(deep=True)
+    standardized_dataset[SENSOR_LIST] = scaler.transform(
+        standardized_dataset[SENSOR_LIST].values
     )
     # print(normalized_dataset)
 
-    class_stats_df = functions.getClassStats(normalized_dataset)
+    class_stats_df = functions.getClassStats(standardized_dataset)
     # print(class_stats_df)
 
-    new_population = ga.spawnRandomPopulation(10, class_stats_df, 0)
+    # Spawn the first population randomly
+    new_population = ga.spawnRandomPopulation(10, class_stats_df)
     populations = [new_population]
 
     for i in range(GENERATIONS - 1):
@@ -34,10 +35,13 @@ def main() -> None:
     avg_sensor_values = class_stats_df.loc[
         (class_stats_df["class"] == "sitting") & (class_stats_df["metric"] == "Average")
     ][SENSOR_LIST].values[0]
-    dataset_fscore = functions.calculateFScore(avg_sensor_values, class_stats_df)
+    dataset_fscore = ga.calculateFScore(avg_sensor_values, class_stats_df)
     functions.plotGenerations(populations, dataset_fscore)
-    print(populations[-1].best_ind.fitness_score)
-    print(populations[-1].best_ind.sensor_data)
+    print(
+        "Best individual from final population:\nFitness score :",
+        populations[-1].best_ind.fitness_score,
+    )
+    print("Sensor values:", populations[-1].best_ind.sensor_data)
     print(dataset_fscore)
     print(avg_sensor_values)
 

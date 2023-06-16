@@ -152,9 +152,9 @@ def singlePointcrossover(parents: list[Individual]) -> list[Individual]:
     return [Individual(sensor_data_1), Individual(sensor_data_2)]
 
 
-def spawnRandomPopulation(pop_size: int, class_stats_df: pd.DataFrame, id: int):
+def spawnRandomPopulation(pop_size: int, class_stats_df: pd.DataFrame):
     individuals = [spawnRandomIndividual(class_stats_df) for i in range(pop_size)]
-    new_pop = Population(individuals, class_stats_df, id)
+    new_pop = Population(individuals, class_stats_df, 0)
     return new_pop
 
 
