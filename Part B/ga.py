@@ -8,7 +8,7 @@ from scipy.spatial.distance import cosine
 SITTING_WEIGHT = 2
 CP = 0.6  # Crossover probability
 INIT_MP = 0.2  # Initial mutation probability
-C = 100
+C = 1
 
 SENSOR_LIST = ["x1", "y1", "z1", "x2", "y2", "z2", "x3", "y3", "z3", "x4", "y4", "z4"]
 
@@ -239,9 +239,9 @@ def spawnNewPopulation(
 
         # Save most fit individual (new elite)
         elif ind.fitness_score > best_ind.fitness_score:
-            print(
-                f"New elite found in population {id} with fitness score: {ind.fitness_score}"
-            )
+            # print(
+            #    f"New elite found in population {id} with fitness score: {ind.fitness_score}"
+            # )
             best_ind = ind
 
     # We need 1 slot for the elite of the previous gen
