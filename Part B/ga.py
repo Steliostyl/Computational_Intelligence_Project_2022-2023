@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
 import random
+import matplotlib.pyplot as plt
+import copy
 
-BONUS_FACTOR = 10
-SITTING_WEIGHT = 1
-MP = 0.05
+SITTING_WEIGHT = 2
+CP = 0.6  # Crossover probability
+INIT_MP = 0.2  # Initial mutation probability
 
 SENSOR_LIST = ["x1", "y1", "z1", "x2", "y2", "z2", "x3", "y3", "z3", "x4", "y4", "z4"]
 
@@ -24,7 +26,7 @@ def calculateFScore(sensor_data: list[float], class_stats_df: pd.DataFrame) -> f
         distance_from_sitting = max(distance_from_sitting, 0.5)
     else:
         distance_from_sitting = 0.5
-    bonus_from_sitting = SITTING_WEIGHT * BONUS_FACTOR / distance_from_sitting
+    bonus_from_sitting = SITTING_WEIGHT / distance_from_sitting
 
     # Calculate the sum of the euclidean distances of the
     # person's sensor values and the average sensor values
@@ -38,7 +40,7 @@ def calculateFScore(sensor_data: list[float], class_stats_df: pd.DataFrame) -> f
                 & (class_stats_df["metric"] == "Average")
             ][SENSOR_LIST].values
         )
-    bonus_from_rest = 4 * BONUS_FACTOR / distance_from_rest
+    bonus_from_rest = 4 / distance_from_rest
     fitness_score = bonus_from_sitting + bonus_from_rest
 
     return fitness_score
@@ -48,76 +50,44 @@ class Individual:
     """Defines an individual of the genetic algorithm."""
 
     def __init__(self, sensor_data: list[float]) -> None:
-        # self.sensor_data = pd.DataFrame([sensor_data], columns=SENSOR_LIST)
         self.sensor_data = sensor_data
         self.fitness_score = 0
         self.pr_n = 0
 
-    def randomResetMutation(self, class_stats_df: pd.DataFrame) -> None:
+    def randomResetMutation(self, class_stats_df: pd.DataFrame, mp) -> None:
         """Performs random reset mutation to genes
         that are selected with probability MP."""
 
         for idx, _ in enumerate(self.sensor_data):
-            n = np.random.uniform(0, 1)
-            if n < MP:
-                min_sensor_value = class_stats_df.loc[
-                    (class_stats_df["class"] == "sitting")
-                    & (class_stats_df["metric"] == "Min")
-                ].values[0]
-                max_sensor_value = class_stats_df.loc[
-                    (class_stats_df["class"] == "sitting")
-                    & (class_stats_df["metric"] == "Max")
-                ].values[0]
-                self.sensor_data[idx] = np.random.uniform(
-                    min_sensor_value[idx], max_sensor_value[idx]
-                )
+            if np.random.uniform(0, 1) > mp:
+                continue
+            min_sensor_value = class_stats_df.loc[
+                (class_stats_df["class"] == "sitting")
+                & (class_stats_df["metric"] == "Min")
+            ].values[0]
+            max_sensor_value = class_stats_df.loc[
+                (class_stats_df["class"] == "sitting")
+                & (class_stats_df["metric"] == "Max")
+            ].values[0]
+            self.sensor_data[idx] = np.random.uniform(
+                min_sensor_value[idx], max_sensor_value[idx]
+            )
 
 
 class Population:
     def __init__(
-        self, individuals: list[Individual], class_stats_df: pd.DataFrame, id: int
+        self, individuals: list[Individual], avg_fitness: float, id: int
     ) -> None:
         self.id = id
         self.individuals = individuals
-        self.min_score = 100
-        self.max_score = 0
-        self.fitness_sum = 0
-        self.avg_fitness = 0
-        self.best_ind = None
-        self.calculateFitnessScores(class_stats_df)
+        self.avg_fitness = avg_fitness
 
-    def calculateFitnessScores(self, class_stats_df: pd.DataFrame) -> None:
-        """Calculates fitness scores for all individuals and saves min/max
-        scores (to be used later in fitness scores normalization)"""
-
-        for individual in self.individuals:
-            individual.fitness_score = calculateFScore(
-                individual.sensor_data, class_stats_df
-            )
-            if individual.fitness_score < self.min_score:
-                self.min_score = individual.fitness_score
-            if individual.fitness_score > self.max_score:
-                self.max_score = individual.fitness_score
-                self.best_ind = individual
-            self.fitness_sum += individual.fitness_score
-
-        self.avg_fitness = self.fitness_sum / len(self.individuals)
-        self.individuals = sorted(
-            self.individuals, key=lambda x: x.fitness_score, reverse=False
-        )
-        prev_total = 0
-        for ind in self.individuals:
-            prev_total += ind.fitness_score / self.fitness_sum
-            ind.pr_n = prev_total
-
-    def biasedWheelSelection(self) -> tuple[Individual, Individual]:
+    def biasedWheelSelection(self) -> list[Individual, Individual]:
         """Chooses 2 individuals from current generation
         by performing biased wheel selection and returns them."""
 
         parent_1 = None
         parent_2 = None
-
-        # [print([ind.fitness_score, ind.pr_n]) for ind in self.individuals]
 
         while (parent_2 is None) or (parent_1 == parent_2):
             number = np.random.uniform(0, 1)
@@ -131,61 +101,195 @@ class Population:
                         parent_2 = selected_ind
                     break
 
-        # print(parent_1.fitness_score, parent_2.fitness_score)
-        return (parent_1, parent_2)
+        return [parent_1, parent_2]
 
     def printPopulation(self) -> None:
         print(f"Average fitness score of population {self.id}: {self.avg_fitness}")
+        print(f"Best fitness score: {self.individuals[-1].fitness_score}")
         [print(ind.fitness_score) for ind in self.individuals]
 
 
-def singlePointcrossover(parents: list[Individual]) -> list[Individual]:
-    # Pick a random crossover point
-    # print(f"Sensor data length: {len(parents[0].sensor_data[0])}")
-    # print(f"Sensor data:\n{parents[0].sensor_data}")
-    k = random.randrange(1, (len(parents[0].sensor_data) - 1))
-    # Keep the first k values of 1st parent and
-    # the rest values from the 2nd parent
-    sensor_data_1 = parents[0].sensor_data[:k] + parents[1].sensor_data[k:]
-    sensor_data_2 = parents[0].sensor_data[k:] + parents[1].sensor_data[:k]
-    # print("Sensor data 1: ", sensor_data_1, type(sensor_data_1))
-    return [Individual(sensor_data_1), Individual(sensor_data_2)]
-
-
 def spawnRandomPopulation(pop_size: int, class_stats_df: pd.DataFrame):
-    individuals = [spawnRandomIndividual(class_stats_df) for i in range(pop_size)]
-    new_pop = Population(individuals, class_stats_df, 0)
-    return new_pop
+    individuals = [spawnRandomIndividual(class_stats_df) for _ in range(pop_size)]
+    fitness_sum = 0
+    best_ind = individuals[0]
+    for ind in individuals:
+        # Add individual's fitness score to the sum
+        fitness_sum += ind.fitness_score
+        # Get elite individual of population
+        if ind.fitness_score > best_ind.fitness_score:
+            best_ind = ind
+
+    # Calculate population's average fitness
+    avg_pop_fitness = fitness_sum / len(individuals)
+
+    # Sort individuals by fitness and assign them pr_n (used for roulette wheel selection)
+    individuals = sorted(individuals, key=lambda x: x.fitness_score, reverse=False)
+    prev_total = 0
+    for ind in individuals:
+        prev_total += ind.fitness_score / fitness_sum
+        ind.pr_n = prev_total
+
+    # Create a new population object and return it
+    return Population(individuals, avg_pop_fitness, 0)
 
 
 def spawnRandomIndividual(class_stats_df: pd.DataFrame) -> Individual:
+    """Spawns and returns a random individual with sensor values in
+    range of the dataset's mins and maxes for each sensor value."""
+
+    # Get sitting stats from class stats
     sitting_stats = class_stats_df.copy(deep=True).loc[
         class_stats_df["class"] == "sitting"
     ]
+    # Get minimum sensor values for the sitting class
     min_values = (
         sitting_stats.loc[sitting_stats["metric"] == "Min"]
         .drop(["class", "metric"], axis=1)
         .values[0]
     )
+    # Get maximum sensor values for the sitting class
     max_values = (
         sitting_stats.loc[sitting_stats["metric"] == "Max"]
         .drop(["class", "metric"], axis=1)
         .values[0]
     )
+    # Randomly generate sensor values in accepted ranges.
     values = [
         np.random.uniform(low=min_values[i], high=max_values[i])
         for i in range(len(min_values))
     ]
 
-    return Individual(sensor_data=values)
+    # Create an individual, calculate their fitness score and return it
+    new_individual = Individual(sensor_data=values)
+    new_individual.fitness_score = calculateFScore(values, class_stats_df)
+    return new_individual
+
+
+def singlePointcrossover(parents: list[Individual]) -> list[Individual]:
+    """Performs random single point crossover
+    on 2 parents with probability CP."""
+
+    # Check whether parents are going to reproduce offsprings
+    # with probability CP. If not, return the parents unchanged.
+    if np.random.uniform(0, 1) > CP:
+        return [copy.deepcopy(p) for p in parents]
+
+    # Pick a random crossover point
+    k = random.randrange(1, (len(parents[0].sensor_data) - 1))
+
+    # Keep the first k values of 1st parent and
+    # the rest values from the 2nd parent
+    sensor_data_1 = parents[0].sensor_data[:k] + parents[1].sensor_data[k:]
+    sensor_data_2 = parents[0].sensor_data[k:] + parents[1].sensor_data[:k]
+
+    # Return the 2 offsprings
+    return [Individual(sensor_data_1), Individual(sensor_data_2)]
 
 
 def spawnNewPopulation(
-    current_pop: Population, class_stats_df: pd.DataFrame, id: int
+    current_pop: Population, class_stats_df: pd.DataFrame, id: int, mp: float
 ) -> Population:
     individuals = []
-    for i in range(len(current_pop.individuals) // 2):
+    pop_size = len(current_pop.individuals)
+
+    # Perform single point crossover on parents selected with wheel selection
+    for i in range(0, pop_size // 2):
         individuals += singlePointcrossover(current_pop.biasedWheelSelection())
 
-    new_population = Population(individuals, class_stats_df, id)
-    return new_population
+    # Initialize variables to be changed within the next loop
+    best_ind = current_pop.individuals[-1]
+    worst_fitness = best_ind.fitness_score
+    fitness_sum = best_ind.fitness_score
+    for i, ind in enumerate(individuals):
+        # Mutate individuals
+        ind.randomResetMutation(class_stats_df, mp)
+        # Calculate fitness scores for new individuals
+        ind.fitness_score = calculateFScore(ind.sensor_data, class_stats_df)
+        fitness_sum += ind.fitness_score
+        # Save least fit individual
+        if ind.fitness_score < worst_fitness:
+            worst_fitness = ind.fitness_score
+            worst_idx = i
+
+        # Save most fit individual (new elite)
+        elif ind.fitness_score > best_ind.fitness_score:
+            print(
+                f"New elite found in population {id} with fitness score: {ind.fitness_score}"
+            )
+            best_ind = ind
+
+    # We need 1 slot for the elite of the previous gen
+    if len(individuals) == pop_size:
+        # Delete least fit individual and update fitness_sum accordingly
+        fitness_sum -= individuals[worst_idx].fitness_score
+        del individuals[worst_idx]
+
+    # Keep best individual from previous population unchanged
+    individuals.append(current_pop.individuals[-1])
+
+    # Calculate average population fitness
+    avg_fitness = fitness_sum / pop_size
+
+    # Sort individuals by fitness and assign them pr_n (used for roulette wheel selection)
+    individuals = sorted(individuals, key=lambda x: x.fitness_score, reverse=False)
+    prev_total = 0
+    for ind in individuals:
+        prev_total += ind.fitness_score / fitness_sum
+        ind.pr_n = prev_total
+
+    return Population(individuals, avg_fitness, id)
+
+
+def getClassStats(df: pd.DataFrame) -> pd.DataFrame:
+    """Returns stats (Min, Max, Avg sensor values) for each class."""
+
+    classes = df["class"].unique()
+    rows = []
+    for cl in classes:
+        class_data_df = df.loc[df["class"] == cl].drop("class", axis=1)
+        rows.append(class_data_df.mean().to_list() + [cl, "Average"])
+        rows.append(class_data_df.min().to_list() + [cl, "Min"])
+        rows.append(class_data_df.max().to_list() + [cl, "Max"])
+
+    return pd.DataFrame(rows, columns=SENSOR_LIST + ["class", "metric"], index=None)
+
+
+def plotGenerations(populations: list, dataset_fscore: float):
+    """Plots generational average and best fitness scores"""
+
+    avg_fscore = []
+    best_ind = []
+    for pop in populations:
+        avg_fscore.append(pop.avg_fitness)
+        best_ind.append(pop.individuals[-1].fitness_score)
+
+    # avg_fscore, best_ind = zip(
+    #    *[(pop.avg_fitness, pop.best_ind) for pop in populations]
+    # )
+
+    x = range(len(avg_fscore))
+
+    # Plot the populations
+    fig, ax1 = plt.subplots()
+
+    # Display fitness score of average sitting values from dataset as a line in the plot
+    ax1.axhline(
+        dataset_fscore,
+        color="r",
+        linestyle="--",
+        label="Best score from dataset's average sensor values",
+    )
+    ax1.plot(x, avg_fscore, marker=".", label="Average fitness score")
+    ax1.plot(x, best_ind, marker=".", label="Best individual")
+    ax1.set_xlabel("Generation")
+    ax1.set_ylabel("Fitness score")
+
+    # Set the title
+    plt.title("Population fitness by generation")
+
+    # Add the legend
+    ax1.legend()
+
+    # Display the plot
+    plt.show()
