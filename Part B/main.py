@@ -65,7 +65,7 @@ def main() -> None:
     avg_sensor_values = class_stats_df.loc[
         (class_stats_df["class"] == "sitting") & (class_stats_df["metric"] == "Average")
     ][SENSOR_LIST].values[0]
-    dataset_fscore = ga.calculateFScore(avg_sensor_values, class_stats_df)
+    dataset_fscore = ga.calculateFScore2(avg_sensor_values, class_stats_df)
 
     # Plot generational average, as well as best fitness scores
     ga.plotGenerations(populations, dataset_fscore)

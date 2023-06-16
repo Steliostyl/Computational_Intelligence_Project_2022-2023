@@ -3,12 +3,37 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import copy
+from scipy.spatial.distance import cosine
 
 SITTING_WEIGHT = 2
 CP = 0.6  # Crossover probability
 INIT_MP = 0.2  # Initial mutation probability
+C = 100
 
 SENSOR_LIST = ["x1", "y1", "z1", "x2", "y2", "z2", "x3", "y3", "z3", "x4", "y4", "z4"]
+
+
+def calculateFScore2(sensor_data: list[float], class_stats_df: pd.DataFrame) -> float:
+    from_sitting = cosine(
+        sensor_data,
+        class_stats_df.loc[
+            (class_stats_df["class"] == "sitting")
+            & (class_stats_df["metric"] == "Average")
+        ][SENSOR_LIST].values[0],
+    )
+
+    from_the_rest = -from_sitting
+    for cl in class_stats_df["class"].unique():
+        from_the_rest += cosine(
+            sensor_data,
+            class_stats_df.loc[
+                (class_stats_df["class"] == cl)
+                & (class_stats_df["metric"] == "Average")
+            ][SENSOR_LIST].values[0],
+        )
+    fitness_score = ((from_sitting + C) * (1 - (from_the_rest / 4))) / 1 + C
+
+    return fitness_score
 
 
 def calculateFScore(sensor_data: list[float], class_stats_df: pd.DataFrame) -> float:
@@ -162,7 +187,7 @@ def spawnRandomIndividual(class_stats_df: pd.DataFrame) -> Individual:
 
     # Create an individual, calculate their fitness score and return it
     new_individual = Individual(sensor_data=values)
-    new_individual.fitness_score = calculateFScore(values, class_stats_df)
+    new_individual.fitness_score = calculateFScore2(values, class_stats_df)
     return new_individual
 
 
@@ -205,7 +230,7 @@ def spawnNewPopulation(
         # Mutate individuals
         ind.randomResetMutation(class_stats_df, mp)
         # Calculate fitness scores for new individuals
-        ind.fitness_score = calculateFScore(ind.sensor_data, class_stats_df)
+        ind.fitness_score = calculateFScore2(ind.sensor_data, class_stats_df)
         fitness_sum += ind.fitness_score
         # Save least fit individual
         if ind.fitness_score < worst_fitness:
