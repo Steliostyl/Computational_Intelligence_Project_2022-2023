@@ -1,0 +1,1 @@
+An exploration of human stance detection and robotic replication. Part A involves developing a neural network to detect human stances. Part B uses Genetic Algorithms to optimize and replicate these stances for an anthropoid robot.
